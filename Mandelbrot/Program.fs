@@ -30,26 +30,23 @@ let calcPixel(col : int, row : int, sizeX : int, sizeY : int, centerX : float, c
     let y = centerY - float (row - sizeY/2) / (magnification * float (minsize-1))
     let i = mandel (iters, x, y)
     if i = 0 then
-        (0, 0, 0)
+        sprintf "0 0 0"
     else
-        (0, i%256, 0)
+        let n = i%256
+        sprintf "0 0 %i" n
 
 
 let generateImage =
     let s = sprintf "P3\n%d %d\n255\n" xsize ysize 
     File.WriteAllText(filePath, s)
     for row in 0 .. ysize-1 do
-        let mutable strings = []
-        for col in 0 .. xsize-1 do
-            let r, g, b = calcPixel(col, row, xsize, ysize, xcenter, ycenter, mag)
-            let rgb = sprintf "%d %d %d" r g b
-            strings <- List.append strings [rgb]
-        strings <- List.append strings ["\n"]
-        File.AppendAllText(filePath, String.concat " " strings)
+        let pixels =
+            Async.Parallel [for col in 0 .. xsize-1 -> async { return calcPixel(col, row, xsize, ysize, xcenter, ycenter, mag) }]
+            |> Async.RunSynchronously
+        File.AppendAllText(filePath, (String.concat " " pixels) + "\n")
         printfn "%i" row
 
 [<EntryPoint>]
 let main argv = 
-    printfn "%A" argv
     generateImage
     0 // return an integer exit code
